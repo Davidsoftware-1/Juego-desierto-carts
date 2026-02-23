@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Blackjack — La Taberna del Bajá (16 Bits)</title>
+<link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet"/>
+<style>
+  /* =========================================
+     ESTÉTICA 16-BITS, FEUDAL Y ÁRABE
+  ========================================= */
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  body {
+    /* Fondo de noche en la caverna */
+    background: #050301;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-family: 'VT323', monospace;
+    color: #e8c060;
+    padding: 10px;
+    gap: 15px;
+  }
+
+  /* Luz de vela (parpadeo sobre la caverna) */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background: radial-gradient(circle at 50% 40%, rgba(255, 140, 0, 0.15) 0%, rgba(0,0,0,0.8) 80%);
+    pointer-events: none;
+    animation: vela 2.5s steps(4, end) infinite alternate;
+    z-index: 10;
+  }
+  @keyframes vela { 
+    0% { opacity: 0.8; } 
+    100% { opacity: 1; } 
+  }
+
+  h1 {
+    font-size: 2.5rem;
+    color: #f0a500;
+    text-shadow: 2px 2px 0px #8b0000;
+    text-align: center;
+    line-height: 1;
+    margin-bottom: 5px;
+    z-index: 1;
+  }
+
+  h1 span {
+    display: block;
+    font-size: 1.2rem;
+    color: #c8922a;
+    letter-spacing: 2px;
+  }
+
+  /* Barra de Información - Estilo RPG clásico */
+  #info {
+    display: flex;
+    gap: 20px;
+    background: #111;
+    border: 2px solid #f0a500;
+    padding: 8px 20px;
+    font-size: 1.4rem;
+    box-shadow: 4px 4px 0px #000;
+    z-index: 1;
+  }
+  #info b { color: #fff; }
+
+  /* Mesa de juego (Estilo tapete Solitario pero oscuro) */
+  #mesa {
+    background: #003311;
+    /* Patrón de tablero de ajedrez sutil para dar textura de 16 bits */
+    background-image: repeating-linear-gradient(45deg, #002200 25%, transparent 25%, transparent 75%, #002200 75%, #002200), repeating-linear-gradient(45deg, #002200 25%, #003311 25%, #003311 75%, #002200 75%, #002200);
+    background-position: 0 0, 10px 10px;
+    background-size: 20px 20px;
+    border: 4px solid #3d2508;
+    padding: 20px;
+    width: 100%;
+    max-width: 700px;
+    box-shadow: inset 4px 4px 0px rgba(0,0,0,0.5), 8px 8px 0px #000;
+    position: relative;
+    z-index: 1;
+  }
+
+  .zona { text-align: center; margin-bottom: 15px; }
+
+  .zona-titulo {
+    font-size: 1.2rem;
+    color: #a0ffa0;
+    margin-bottom: 5px;
+    text-shadow: 1px 1px 0px #000;
+  }
+
+  /* Puntuación estilo bloque */
+  .puntos {
+    display: inline-block;
+    font-size: 1.8rem;
+    background: #000;
+    border: 2px solid #e8c060;
+    padding: 0 15px;
+    min-width: 60px;
+    margin-top: 5px;
+    color: #fff;
+    box-shadow: 2px 2px 0px #3d2508;
+  }
+  .puntos.bust { color: #ff5050; border-color: #ff5050; }
+  .puntos.bj   { color: #ffd700; border-color: #ffd700; animation: blink 0.5s steps(2, start) infinite; }
+  @keyframes blink { to { visibility: hidden; } }
+
+  /* Mano de cartas */
+  .mano {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: -30px; /* Cartas superpuestas estilo Solitario */
+    min-height: 120px;
+    padding: 10px 0;
+  }
+
+  /* CARTAS - ESTILO SOLITARIO WINDOWS / 16 BITS */
+  .carta {
+    width: 76px;
+    height: 106px;
+    position: relative;
+    margin-left: -20px; /* Superposición */
+    animation: repartir 0.2s steps(4, end) both;
+  }
+  .mano .carta:first-child { margin-left: 0; }
+
+  @keyframes repartir {
+    from { opacity: 0; transform: translateY(-20px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Frente de la carta */
+  .c-frente {
+    position: absolute; inset: 0;
+    background: #fff;
+    border: 2px solid #000;
+    box-shadow: 2px 2px 0px rgba(0,0,0,0.8);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 2px 4px;
+  }
+
+  .c-top { font-size: 1.4rem; line-height: 0.9; text-align: left; }
+  .c-mid { font-size: 2.5rem; text-align: center; flex: 1; display: flex; align-items: center; justify-content: center; line-height: 0;}
+  .c-bot { font-size: 1.4rem; line-height: 0.9; text-align: right; transform: rotate(180deg); }
+
+  .rojo  { color: #d00000; }
+  .negro { color: #000000; }
+
+  /* Dorso árabe / feudal píxel */
+  .c-dorso {
+    position: absolute; inset: 0;
+    background: #5a1010;
+    background-image: repeating-linear-gradient(45deg, #3d0808 25%, transparent 25%, transparent 75%, #3d0808 75%, #3d0808), repeating-linear-gradient(45deg, #3d0808 25%, #5a1010 25%, #5a1010 75%, #3d0808 75%, #3d0808);
+    background-position: 0 0, 8px 8px;
+    background-size: 16px 16px;
+    border: 2px solid #000;
+    box-shadow: 2px 2px 0px rgba(0,0,0,0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+    color: #f0a500;
+  }
+
+  .carta.oculta .c-frente  { display: none; }
+  .carta:not(.oculta) .c-dorso { display: none; }
+
+  /* Mensaje resultado */
+  #resultado { text-align: center; min-height: 40px; margin-top: 10px; }
+  #resultado-txt {
+    font-size: 2rem;
+    text-shadow: 2px 2px 0px #000;
+  }
+  .win  { color: #ffd700; }
+  .lose { color: #ff5050; }
+  .push { color: #aaaaaa; }
+
+  /* Fichas e Interfaz */
+  #apuesta-wrap {
+    display: flex; flex-direction: column; align-items: center; gap: 10px; z-index: 1;
+  }
+
+  #fichas { display: flex; gap: 15px; }
+
+  /* Fichas poligonales retro */
+  .ficha {
+    width: 50px; height: 50px;
+    border: 3px solid #000;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    font-size: 1.2rem;
+    cursor: pointer;
+    box-shadow: 2px 2px 0px rgba(0,0,0,0.8);
+    position: relative;
+  }
+  .ficha:active { transform: translate(2px, 2px); box-shadow: 0px 0px 0px #000; }
+  .ficha span { font-size: 0.8rem; line-height: 0.8; }
+
+  .f1   { background: #aaa; color: #000; }
+  .f5   { background: #d00000; color: #fff; }
+  .f25  { background: #008800; color: #fff; }
+  .f100 { background: #f0a500; color: #000; }
+
+  #apuesta-info {
+    font-size: 1.5rem; color: #fff; background: #000; padding: 2px 15px; border: 2px solid #5a1010;
+  }
+
+  /* Botones 16 bits */
+  #acciones { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; z-index: 1; margin-bottom: 20px;}
+
+  .btn {
+    font-family: 'VT323', monospace;
+    font-size: 1.5rem;
+    padding: 8px 16px;
+    border: 3px solid #fff;
+    cursor: pointer;
+    text-transform: uppercase;
+    box-shadow: 3px 3px 0px #000;
+    background: #333;
+    color: #fff;
+  }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; box-shadow: none; transform: translate(2px, 2px); }
+  .btn:not(:disabled):active { transform: translate(3px, 3px); box-shadow: 0px 0px 0px #000; }
+
+  .btn-deal   { background: #f0a500; color: #000; border-color: #ffd700; }
+  .btn-hit    { background: #008800; border-color: #a0ffa0; }
+  .btn-stand  { background: #8b0000; border-color: #ffaaaa; }
+  .btn-double { background: #4a1a8a; border-color: #ccaaff; }
+
+  /* Frase del Bajá */
+  #frase {
+    font-size: 1.5rem;
+    color: #f0a500;
+    text-shadow: 1px 1px 0px #000;
+    text-align: center;
+    background: rgba(0,0,0,0.6);
+    padding: 5px 15px;
+    border: 1px dashed #f0a500;
+    z-index: 1;
+  }
+</style>
+</head>
+<body>
+
+<h1>La Taberna del Bajá <span>[ EDICIÓN 16 BITS - 1852 ]</span></h1>
+
+<div id="info">
+  <div>DINARES: <b id="d-dinares">1000</b></div>
+  <div>VICTORIAS: <b id="d-wins">0</b></div>
+</div>
+
+<div id="mesa">
+  <div class="zona">
+    <div class="zona-titulo">MANO DEL BAJÁ</div>
+    <div class="mano" id="mano-baja"></div>
+    <div class="puntos" id="pts-baja">?</div>
+  </div>
+
+  <div class="zona">
+    <div class="zona-titulo">TU MANO</div>
+    <div class="mano" id="mano-jugador"></div>
+    <div class="puntos" id="pts-jugador">0</div>
+  </div>
+
+  <div id="resultado"><div id="resultado-txt"></div></div>
+</div>
+
+<div id="apuesta-wrap">
+  <div id="fichas">
+    <div class="ficha f1"   onclick="apostar(1)">1<span>din</span></div>
+    <div class="ficha f5"   onclick="apostar(5)">5<span>din</span></div>
+    <div class="ficha f25"  onclick="apostar(25)">25<span>din</span></div>
+    <div class="ficha f100" onclick="apostar(100)">100<span>din</span></div>
+  </div>
+  <div id="apuesta-info">APUESTA: <span id="apuesta-num" style="color:#f0a500;">0</span></div>
+</div>
+
+<div id="acciones">
+  <button class="btn btn-deal"   id="btn-repartir" onclick="repartir()" disabled>REPARTIR</button>
+  <button class="btn btn-hit"    id="btn-pedir"    onclick="pedir()"    disabled>PEDIR</button>
+  <button class="btn btn-stand"  id="btn-plantar"  onclick="plantarse()" disabled>PLANTARSE</button>
+  <button class="btn btn-double" id="btn-doblar"   onclick="doblar()"   disabled>DOBLAR</button>
+</div>
+
+<div id="frase">"Maktub. Deja tus dinares en la mesa."</div>
+
+<script>
+/* ===========================================
+   LÓGICA DEL JUEGO (Nivel Junior - Código Limpio)
+=========================================== */
+
+// 1. Constantes del Mazo
+const PALOS  = ['♠','♥','♦','♣'];
+const VALS   = ['A','2','3','4','5','6','7','8','9','10','J','Q','K'];
+
+// 2. Variables de Estado
+let mazo = [], manoJ = [], manoB = [];
+let dinares = 1000, apuesta = 0, wins = 0;
+let estado = 'apuesta'; // Fases: 'apuesta', 'jugando', 'fin'
+
+// 3. Frases Aleatorias (Lore del juego)
+const frases = {
+  inicio: ['"Haz tu apuesta, forastero."', '"La noche es larga en el desierto."'],
+  gana:   ['"¡Maldición! Te llevas mi oro."', '"La suerte del tonto... Ganas."'],
+  pierde: ['"Tus dinares son míos ahora."', '"El desierto reclama lo suyo."'],
+  empate: ['"Nadie gana. Recuperas tu oro."', '"Empate. Un truco del destino."'],
+  bj:     ['"¡Blackjack! Por las arenas infinitas..."'],
+  bust:   ['"Te pasaste de 21. Perdiste."', '"¡Demasiada codicia! Te quemaste."']
+};
+
+function decir(tipo) {
+  const opciones = frases[tipo];
+  document.getElementById('frase').textContent = opciones[Math.floor(Math.random() * opciones.length)];
+}
+
+/* ===========================================
+   AUDIO RETRO 16-BITS (Ondas Cuadradas)
+=========================================== */
+const ctxAudio = new (window.AudioContext || window.webkitAudioContext)();
+
+function sfx(tipo) {
+  if (ctxAudio.state === 'suspended') ctxAudio.resume();
+  const osc = ctxAudio.createOscillator();
+  const gain = ctxAudio.createGain();
+  osc.connect(gain);
+  gain.connect(ctxAudio.destination);
+  
+  const t = ctxAudio.currentTime;
+  osc.type = 'square'; // Sonido "Chiptune" clásico
+
+  if (tipo === 'ficha') {
+    osc.frequency.setValueAtTime(800, t);
+    osc.frequency.exponentialRampToValueAtTime(1200, t + 0.1);
+    gain.gain.setValueAtTime(0.1, t);
+    gain.gain.exponentialRampToValueAtTime(0.01, t + 0.1);
+    osc.start(t); osc.stop(t + 0.1);
+  } else if (tipo === 'carta') {
+    osc.frequency.setValueAtTime(400, t);
+    osc.frequency.exponentialRampToValueAtTime(200, t + 0.1);
+    gain.gain.setValueAtTime(0.1, t);
+    gain.gain.exponentialRampToValueAtTime(0.01, t + 0.1);
+    osc.start(t); osc.stop(t + 0.1);
+  } else if (tipo === 'win') {
+    osc.frequency.setValueAtTime(440, t);
+    osc.frequency.setValueAtTime(554, t + 0.1);
+    osc.frequency.setValueAtTime(659, t + 0.2);
+    gain.gain.setValueAtTime(0.1, t);
+    gain.gain.linearRampToValueAtTime(0, t + 0.5);
+    osc.start(t); osc.stop(t + 0.5);
+  } else if (tipo === 'lose') {
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(200, t);
+    osc.frequency.exponentialRampToValueAtTime(50, t + 0.4);
+    gain.gain.setValueAtTime(0.1, t);
+    gain.gain.linearRampToValueAtTime(0, t + 0.4);
+    osc.start(t); osc.stop(t + 0.4);
+  }
+}
+
+/* ===========================================
+   SISTEMA DE CARTAS
+=========================================== */
+function crearMazo() {
+  let nuevoMazo = [];
+  for(let palo of PALOS) {
+    for(let valor of VALS) {
+      nuevoMazo.push({ v: valor, p: palo });
+    }
+  }
+  // Mezclar (Algoritmo Fisher-Yates)
+  for (let i = nuevoMazo.length - 1; i > 0; i--) {
+    let j = Math.floor(Math.random() * (i + 1));
+    [nuevoMazo[i], nuevoMazo[j]] = [nuevoMazo[j], nuevoMazo[i]];
+  }
+  return nuevoMazo;
+}
+
+function sacarCarta() {
+  if (mazo.length < 10) mazo = crearMazo();
+  return mazo.pop();
+}
+
+function calcularPuntos(mano) {
+  let total = 0;
+  let ases = 0;
+
+  mano.forEach(carta => {
+    if (carta.v === 'A') { ases += 1; total += 11; }
+    else if (['J','Q','K'].includes(carta.v)) { total += 10; }
+    else { total += parseInt(carta.v); }
+  });
+
+  // Si nos pasamos de 21 y tenemos Ases, el As vale 1 en vez de 11
+  while (total > 21 && ases > 0) {
+    total -= 10;
+    ases -= 1;
+  }
+  return total;
+}
+
+/* ===========================================
+   INTERFAZ (RENDERIZADO DOM)
+=========================================== */
+function crearElementoCarta(carta, oculta) {
+  const div = document.createElement('div');
+  div.className = 'carta' + (oculta ? ' oculta' : '');
+  
+  const colorClase = (carta.p === '♥' || carta.p === '♦') ? 'rojo' : 'negro';
+  
+  div.innerHTML = `
+    <div class="c-dorso">☽</div>
+    <div class="c-frente">
+      <div class="c-top ${colorClase}">${carta.v}</div>
+      <div class="c-mid ${colorClase}">${carta.p}</div>
+      <div class="c-bot ${colorClase}">${carta.v}</div>
+    </div>`;
+  return div;
+}
+
+function dibujarMano(idContenedor, mano, esconderPrimera) {
+  const contenedor = document.getElementById(idContenedor);
+  contenedor.innerHTML = '';
+  
+  mano.forEach((carta, index) => {
+    const esOculta = esconderPrimera && index === 0;
+    const elemento = crearElementoCarta(carta, esOculta);
+    contenedor.appendChild(elemento);
+  });
+}
+
+function actualizarMarcadores() {
+  // Puntos Jugador
+  const ptsJ = calcularPuntos(manoJ);
+  const uiJ = document.getElementById('pts-jugador');
+  uiJ.textContent = ptsJ;
+  uiJ.className = 'puntos' + (ptsJ > 21 ? ' bust' : '') + (ptsJ === 21 && manoJ.length === 2 ? ' bj' : '');
+
+  // Puntos Bajá (Crupier)
+  const uiB = document.getElementById('pts-baja');
+  const hayOculta = document.querySelector('#mano-baja .carta.oculta');
+  
+  if (hayOculta) {
+    // Si la primera está oculta, solo mostramos el valor de la segunda carta
+    uiB.textContent = '?';
+    uiB.className = 'puntos';
+  } else {
+    const ptsB = calcularPuntos(manoB);
+    uiB.textContent = ptsB;
+    uiB.className = 'puntos' + (ptsB > 21 ? ' bust' : '') + (ptsB === 21 && manoB.length === 2 ? ' bj' : '');
+  }
+
+  // Interfaz General
+  document.getElementById('d-dinares').textContent = dinares;
+  document.getElementById('apuesta-num').textContent = apuesta;
+  document.getElementById('d-wins').textContent = wins;
+}
+
+function controles(jugando) {
+  document.getElementById('btn-repartir').disabled = jugando || apuesta === 0;
+  document.getElementById('btn-pedir').disabled = !jugando;
+  document.getElementById('btn-plantar').disabled = !jugando;
+  document.getElementById('btn-doblar').disabled = !jugando || manoJ.length !== 2 || dinares < apuesta;
+}
+
+/* ===========================================
+   ACCIONES DEL JUEGO
+=========================================== */
+function apostar(cantidad) {
+  if (estado !== 'apuesta') return;
+  if (dinares >= cantidad) {
+    dinares -= cantidad;
+    apuesta += cantidad;
+    sfx('ficha');
+    actualizarMarcadores();
+    controles(false); // Habilita botón repartir
+  }
+}
+
+function repartir() {
+  if (apuesta === 0 || estado !== 'apuesta') return;
+  estado = 'jugando';
+  document.getElementById('resultado-txt').textContent = '';
+  
+  mazo = crearMazo();
+  manoJ = [sacarCarta(), sacarCarta()];
+  manoB = [sacarCarta(), sacarCarta()];
+  
+  sfx('carta');
+  dibujarMano('mano-jugador', manoJ, false);
+  dibujarMano('mano-baja', manoB, true);
+  
+  actualizarMarcadores();
+  controles(true);
+
+  // Verificar Blackjack Natural al instante
+  if (calcularPuntos(manoJ) === 21) {
+    decir('bj');
+    turnoBaja();
+  }
+}
+
+function pedir() {
+  manoJ.push(sacarCarta());
+  sfx('carta');
+  dibujarMano('mano-jugador', manoJ, false);
+  actualizarMarcadores();
+
+  const puntos = calcularPuntos(manoJ);
+  if (puntos > 21) {
+    decir('bust');
+    sfx('lose');
+    finalizarRonda('lose', '💀 TE PASASTE');
+  } else if (puntos === 21) {
+    plantarse();
+  } else {
+    // Deshabilitar doblar después de pedir
+    document.getElementById('btn-doblar').disabled = true;
+  }
+}
+
+function doblar() {
+  if (dinares >= apuesta) {
+    dinares -= apuesta;
+    apuesta *= 2;
+    sfx('ficha');
+    
+    manoJ.push(sacarCarta());
+    dibujarMano('mano-jugador', manoJ, false);
+    actualizarMarcadores();
+    
+    if (calcularPuntos(manoJ) > 21) {
+      sfx('lose');
+      finalizarRonda('lose', '💀 TE PASASTE Y PERDISTE EL DOBLE');
+    } else {
+      plantarse();
+    }
+  }
+}
+
+function plantarse() {
+  controles(false);
+  document.getElementById('btn-repartir').disabled = true;
+  turnoBaja();
+}
+
+/* ===========================================
+   INTELIGENCIA DEL BAJÁ Y RESOLUCIÓN
+=========================================== */
+function turnoBaja() {
+  // Voltea su carta oculta
+  dibujarMano('mano-baja', manoB, false);
+  actualizarMarcadores();
+  sfx('carta');
+
+  // El Crupier DEBE pedir carta si tiene menos de 17
+  function pensar() {
+    if (calcularPuntos(manoB) < 17) {
+      setTimeout(() => {
+        manoB.push(sacarCarta());
+        dibujarMano('mano-baja', manoB, false);
+        actualizarMarcadores();
+        sfx('carta');
+        pensar();
+      }, 800);
+    } else {
+      evaluarGanador();
+    }
+  }
+  
+  setTimeout(pensar, 800);
+}
+
+function evaluarGanador() {
+  const ptsJ = calcularPuntos(manoJ);
+  const ptsB = calcularPuntos(manoB);
+  
+  const esBjJ = (ptsJ === 21 && manoJ.length === 2);
+  const esBjB = (ptsB === 21 && manoB.length === 2);
+
+  if (esBjJ && !esBjB) {
+    dinares += apuesta + (apuesta * 1.5); // Paga 3 a 2
+    wins++; sfx('win'); decir('bj');
+    finalizarRonda('win', '★ BLACKJACK ★');
+  } 
+  else if (ptsB > 21) {
+    dinares += apuesta * 2;
+    wins++; sfx('win'); decir('gana');
+    finalizarRonda('win', 'GANASTE (EL BAJÁ SE PASÓ)');
+  } 
+  else if (ptsJ > ptsB) {
+    dinares += apuesta * 2;
+    wins++; sfx('win'); decir('gana');
+    finalizarRonda('win', '¡GANASTE!');
+  } 
+  else if (ptsB > ptsJ || (esBjB && !esBjJ)) {
+    sfx('lose'); decir('pierde');
+    finalizarRonda('lose', 'PERDISTE');
+  } 
+  else {
+    dinares += apuesta; // Empate, devuelve la apuesta
+    decir('empate');
+    finalizarRonda('push', 'EMPATE');
+  }
+}
+
+function finalizarRonda(claseCSS, texto) {
+  estado = 'fin';
+  const elTexto = document.getElementById('resultado-txt');
+  elTexto.className = claseCSS;
+  elTexto.textContent = texto;
+  
+  actualizarMarcadores();
+
+  if (dinares <= 0) {
+    setTimeout(() => alert("Te has quedado sin dinares, forastero. Refresca la página para volver a intentarlo."), 1000);
+    return;
+  }
+
+  // Reiniciar estado para nueva apuesta
+  setTimeout(() => {
+    estado = 'apuesta';
+    apuesta = 0;
+    manoJ = []; manoB = [];
+    document.getElementById('resultado-txt').textContent = '';
+    dibujarMano('mano-jugador', [], false);
+    dibujarMano('mano-baja', [], false);
+    actualizarMarcadores();
+    controles(false);
+    decir('inicio');
+  }, 2500);
+}
+</script>
+</body>
+</html>
